@@ -44,13 +44,6 @@ os.environ["TZ"] = "UTC"
 start_time = datetime.utcfromtimestamp(int(args[4]))
 end_time = datetime.utcfromtimestamp(int(args[5]))
 
-# https://wiki.openstreetmap.org/wiki/API_v0.6#Query:_GET_.2Fapi.2F0.6.2Fchangesets
-
-changesets = api.ChangesetsGet(min_lon = min_lon, min_lat = min_lat,
-                               max_lon = max_lon, max_lat = max_lat,
-                               closed_after = start_time.strftime("%Y-%m-%dT%H:%M:%S+00:00"),
-                               created_before = end_time.strftime("%Y-%m-%dT%H:%M:%S+00:00"))
-
 changed_objects = {
     "node": {},
     "way": {},
@@ -59,23 +52,56 @@ changed_objects = {
 
 search_area = (max_lon - min_lon) * (max_lat - min_lat)
 
-for changeset_id in changesets:
-    changeset_meta = api.ChangesetGet(changeset_id)
-    changeset_area = (float(changeset_meta["max_lon"]) - float(changeset_meta["min_lon"])) * (float(changeset_meta["max_lat"]) - float(changeset_meta["min_lat"]))
-    area_ratio = changeset_area / search_area
-    sys.stderr.write("Downloading changeset {0} (area ratio {1})... ".format(changeset_id, area_ratio))
-    changeset = api.ChangesetDownload(changeset_id)
-    # FIXME: Add --exclude option instead of hardcoding.
-    count = len(changeset)
-    sys.stderr.write("(count {0}) ".format(count))
-    if area_ratio > 1000 and count > 30:
-        sys.stderr.write("Skipping!\n".format(changeset_id, area_ratio))
-        continue
-    sys.stderr.write("\n")
-    for change in changeset:
-        t = change["type"]
-        i = change["data"]["id"]
-        changed_objects[t][i] = True
+search_start = start_time
+search_end = end_time
+
+while True:
+    # https://wiki.openstreetmap.org/wiki/API_v0.6#Query:_GET_.2Fapi.2F0.6.2Fchangesets
+    changesets = api.ChangesetsGet(min_lon = min_lon, min_lat = min_lat,
+                                   max_lon = max_lon, max_lat = max_lat,
+                                   closed_after = search_start.strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+                                   created_before = search_end.strftime("%Y-%m-%dT%H:%M:%S+00:00"))
+
+    closed_min = None
+    closed_max = None
+    created_min = None
+    created_max = None
+
+    for changeset_id in changesets:
+        changeset_meta = api.ChangesetGet(changeset_id)
+        if closed_min is None or changeset_meta["closed_at"] < closed_min:
+            closed_min = changeset_meta["closed_at"]
+        if closed_max is None or changeset_meta["closed_at"] > closed_max:
+            closed_max = changeset_meta["closed_at"]
+        if created_min is None or changeset_meta["created_at"] < created_min:
+            created_min = changeset_meta["created_at"]
+        if created_max is None or changeset_meta["created_at"] > created_max:
+            created_max = changeset_meta["created_at"]
+        changeset_area = (float(changeset_meta["max_lon"]) - float(changeset_meta["min_lon"])) * (float(changeset_meta["max_lat"]) - float(changeset_meta["min_lat"]))
+        area_ratio = changeset_area / search_area
+        sys.stderr.write("Downloading changeset {0} (area ratio {1})... ".format(changeset_id, area_ratio))
+        changeset = api.ChangesetDownload(changeset_id)
+        # FIXME: Add --exclude option instead of hardcoding.
+        count = len(changeset)
+        sys.stderr.write("(count {0}) ".format(count))
+        if area_ratio > 1000 and count > 30:
+            sys.stderr.write("Skipping!\n".format(changeset_id, area_ratio))
+            continue
+        sys.stderr.write("\n")
+        for change in changeset:
+            t = change["type"]
+            i = change["data"]["id"]
+            changed_objects[t][i] = True
+
+    if len(changesets) < 100:
+        sys.stderr.write("Search produced {0} changesets, stopping.\n".format(len(changesets)))
+        break
+    # We were limited to 100 changesets, so fiddle with the times to get more.
+    sys.stderr.write("Search  {0} to {1}\n".format(search_start, search_end))
+    sys.stderr.write("Created {0} to {1}\n".format(created_min, created_max))
+    sys.stderr.write("Closed  {0} to {1}\n".format(closed_min, closed_max))
+    sys.stderr.write("Doing revised search.\n")
+    search_end = closed_min
 
 for node_id in changed_objects["node"]:
     sys.stderr.write("Downloading node {0}.\n".format(node_id))
