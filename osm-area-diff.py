@@ -57,17 +57,8 @@ changed_objects = {
     "relation": {}
 }
 
-search_area = (max_lon - min_lon) * (max_lat - min_lat)
-
 for changeset_id in changesets:
-    changeset_meta = api.ChangesetGet(changeset_id)
-    changeset_area = (float(changeset_meta["max_lon"]) - float(changeset_meta["min_lon"])) * (float(changeset_meta["max_lat"]) - float(changeset_meta["min_lat"]))
-    area_ratio = changeset_area / search_area
-    # FIXME: Add --exclude option instead of hardcoding.
-    if area_ratio > 1000:
-        sys.stderr.write("Skipping changeset {0} (area ratio {1}).\n".format(changeset_id, area_ratio))
-        continue
-    sys.stderr.write("Downloading changeset {0} (area ratio {1}).\n".format(changeset_id, area_ratio))
+    sys.stderr.write("Downloading changeset {0}.\n".format(changeset_id))
     changeset = api.ChangesetDownload(changeset_id)
     for change in changeset:
         t = change["type"]
