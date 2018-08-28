@@ -87,7 +87,8 @@ for node_id in changed_objects["node"]:
         if t < end_time:
             end_version = v # overwrites repeatedly
     if start_version is None:
-        print "Presence: node {0} added.".format(node_id)
+        if end_version["visible"]:
+            print "Presence: node {0} added.".format(node_id)
         continue
     if start_version["visible"] != end_version["visible"]:
         print "Presence: node {0} {1}.".format(node_id, "removed" if start_version["visible"] else "re-added")
@@ -112,7 +113,8 @@ for way_id in changed_objects["way"]:
         if t < end_time:
             end_version = v # overwrites repeatedly
     if start_version is None:
-        print "Presence: way {0} added.".format(way_id)
+        if end_version["visible"]:
+            print "Presence: way {0} added.".format(way_id)
         continue
     if start_version["visible"] != end_version["visible"]:
         print "Presence: way {0} {1}.".format(way_id, "removed" if start_version["visible"] else "re-added")
@@ -135,7 +137,8 @@ for relation_id in changed_objects["relation"]:
         if t < end_time:
             end_version = v # overwrites repeatedly
     if start_version is None:
-        print "Presence: relation {0} added.".format(relation_id)
+        if end_version["visible"]:
+            print "Presence: relation {0} added.".format(relation_id)
         continue
     if start_version["visible"] != end_version["visible"]:
         print "Presence: relation {0} {1}.".format(relation_id, "removed" if start_version["visible"] else "re-added")
